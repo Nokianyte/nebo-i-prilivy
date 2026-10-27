@@ -113,7 +113,7 @@ root.innerHTML=`<style>${OPT.css}</style>
 <div class="nbp-cr"><span>Место</span><select data-k="city" style="width:210px"></select><span>Шир.</span><input type="number" data-k="lat" step="0.1" min="-90" max="90" style="width:80px"><span>Долг.</span><input type="number" data-k="lon" step="0.1" min="-180" max="180" style="width:80px"></div>
 <div class="nbp-cr"><span>Год</span><input type="number" data-k="yr" min="0" max="999" step="1" style="width:80px"><span>Сезон</span><select data-k="sea" style="width:120px">${CAL.seasons.map(x=>`<option>${x}</option>`).join("")}</select><button data-k="play">▶ Пуск</button></div>
 <div class="nbp-sl"><span class="nbp-l">Сутки сезона</span><input type="range" data-k="dy" min="1" max="${SD}" step="1"><span class="nbp-o" data-k="dyO"></span></div>
-<div class="nbp-sl"><span class="nbp-l">Мировой час</span><input type="range" data-k="hr" min="0" max="${DH-0.01}" step="0.01"><span class="nbp-o" data-k="hrO"></span></div>
+<div class="nbp-sl"><span class="nbp-l">Мировой час</span><input type="range" data-k="hr" min="0" max="${DH-0.001}" step="any"><span class="nbp-o" data-k="hrO"></span></div>
 <div class="nbp-cr" style="margin-top:6px"><span>Вид</span><select data-k="mode" style="width:170px"><option value="cam">Камера</option><option value="pan">Панорама 360°</option></select><button data-k="lkN">На Небеса</button><button data-k="lkS">На солнце</button><button data-k="lkM">На луну</button></div>
 <div class="nbp-sl"><span class="nbp-l">Направление</span><input type="range" data-k="yaw" min="0" max="359.9" step="0.1" value="180"><span class="nbp-o" data-k="yawO"></span></div>
 <div class="nbp-sl"><span class="nbp-l">Наклон вверх</span><input type="range" data-k="pit" min="-60" max="90" step="0.1" value="10"><span class="nbp-o" data-k="pitO"></span></div>
@@ -550,7 +550,7 @@ const TLH=0;
 const vc=[];for(let ci=0;ci<cuts.length;ci++){const az=cuts[ci],az2=ci+1<cuts.length?cuts[ci+1]:cuts[0]+360;vc.push(V.vis((az+az2)/2,4)?[az,az2]:null);}
 for(let b=0;b<bands.length-1;b++){const dB=dAt((bands[b]+bands[b+1])/2),runs=[];let cur=null;for(const s of vc){if(!s){cur=null;continue;}const[az,az2]=s,isS=isSeaAz((az+az2)/2,dB);if(!cur||cur.isS!==isS||az2-cur.a0>90){cur={isS,a0:az,azs:[az]};runs.push(cur);}cur.azs.push(az2);}
 for(const r of runs){const col=rgb(mix(r.isS?watA:landA,hzC,hzK(dB))),A=r.azs.map((a,k)=>a+(k===r.azs.length-1?0.12:0)),top=A.map(a=>prj(enu(bands[b],a),r.a0)),bot=A.map(a=>prj(enu(bands[b+1],a),r.a0));
-if(top.every(okp)&&bot.every(okp))gr+=poly(top.concat(bot.reverse()),col,`stroke="${col}" stroke-width="0.8"`);else for(let k=0;k<A.length-1;k++){const q=[top[k],top[k+1],bot[A.length-2-k],bot[A.length-1-k]];if(q.every(okp))gr+=poly(q,col,`stroke="${col}" stroke-width="0.8"`);}}}}$('grnd').innerHTML=gr;
+if(top.every(okp)&&bot.every(okp))gr+=poly(top.concat(bot.reverse()),col,`stroke="${col}" stroke-width="0.8"`);else for(let k=0;k<A.length-1;k++){const q=[top[k],top[k+1],bot[k+1],bot[k]];if(q.every(okp))gr+=poly(q,col,`stroke="${col}" stroke-width="0.8"`);}}}}$('grnd').innerHTML=gr;
 // ---------- local 3D ----------
 const harbour=LOC.port,atSea=!LOC.onLand;const sr=sea*D2R,f=[Math.sin(sr),Math.cos(sr),0],rt=[Math.cos(sr),-Math.sin(sr),0];
 const P=(fv,rv,z)=>[fv*f[0]+rv*rt[0],fv*f[1]+rv*rt[1],z];const zw=g.tide-QH;
@@ -690,7 +690,7 @@ $('city').onchange=()=>{if($('city').value!=='')pickCity(+$('city').value);};
 ['tSh','tWx','tRl','tBi'].forEach(k=>$(k).addEventListener('change',draw));
 $('fl').addEventListener('input',()=>{spSetFloor();draw();});
 let tm=null;const stop=()=>{if(tm){cancelAnimationFrame(tm);tm=null;}$('play').textContent='▶ Пуск';};
-$('play').onclick=()=>{if(tm){stop();return;}$('play').textContent='⏸ Пауза';let last=performance.now();const step=now=>{if(!root.isConnected){stop();return;}const dh=Math.min(0.6,(now-last)/1000*(PRM.scene.play_hours_per_s||2.5));last=now;let h=+$('hr').value+dh;if(h>=DH){h-=DH;let d=+$('dy').value+1;if(d>SD){d=1;let s=$('sea').selectedIndex+1;if(s>3){s=0;$('yr').value=+$('yr').value+1;}$('sea').selectedIndex=s;}$('dy').value=d;}$('hr').value=h.toFixed(2);draw();tm=requestAnimationFrame(step);};tm=requestAnimationFrame(step);};
+$('play').onclick=()=>{if(tm){stop();return;}$('play').textContent='⏸ Пауза';let last=performance.now();const step=now=>{if(!root.isConnected){stop();return;}const spd=OPT.speed?OPT.speed():(PRM.scene.play_hours_per_s||2.5),dh=Math.min(spd*0.12,(now-last)/1000*spd);last=now;let h=+$('hr').value+dh;while(h>=DH){h-=DH;let d=+$('dy').value+1;if(d>SD){d=1;let s=$('sea').selectedIndex+1;if(s>3){s=0;$('yr').value=+$('yr').value+1;}$('sea').selectedIndex=s;}$('dy').value=d;}$('hr').value=h.toFixed(4);draw();tm=requestAnimationFrame(step);};tm=requestAnimationFrame(step);};
 $('yr').value=inp.year??CAL.start_year;$('sea').selectedIndex=typeof inp.season==='string'?Math.max(0,secs.indexOf(inp.season)):(inp.season??0);
 if(inp.floor!==undefined)$('fl').value=inp.floor;$('dy').value=inp.day??1;$('hr').value=inp.hour??6;$('fov').value=inp.fov??PRM.scene.default_fov;$('mode').value=inp.mode??'cam';
 let ci=PRE.findIndex(c=>c[0].startsWith(inp.city||PRM.scene.default_city));if(ci<0)ci=1;pickCity(ci);
@@ -700,7 +700,9 @@ const app=document.getElementById('app');
 const css='';
 const W0=innerWidth,H0=innerHeight;
 let infoOff=true;
-const S=initScene(app,DATA,{lazyInfo:()=>infoOff,params:PARAMS,theme:{text:"#e8e6e1",border:"rgba(255,255,255,.18)"},css,vw:W0,vh:H0});
+// play speed: logarithmic slider, world hours per real second
+const SPD=[0.05,880],spdOf=v=>SPD[0]*Math.pow(SPD[1]/SPD[0],v/100),spdTxt=h=>h<1?`${Math.round(h*60)} мин/с`:h<44?`${h<10?h.toFixed(1):Math.round(h)} ч/с`:`${(h/44).toFixed(h<440?1:0)} сут/с`;let SPEED=2.5;
+const S=initScene(app,DATA,{speed:()=>SPEED,lazyInfo:()=>infoOff,params:PARAMS,theme:{text:"#e8e6e1",border:"rgba(255,255,255,.18)"},css,vw:W0,vh:H0});
 const q=k=>app.querySelector(`[data-k="${k}"]`);
 // ---- rearrange the generated interface: stage / left panel / right drawer ----
 const kids=[...app.children].filter(e=>e.tagName!=='STYLE');
@@ -716,6 +718,9 @@ const has=(e,k)=>!!e.querySelector(`[data-k="${k}"]`);
 const groups=[['Место',e=>has(e,'city')||has(e,'flRow')||e.dataset.k==='flRow'||has(e,'seaD')],['Время',e=>has(e,'yr')||has(e,'dy')||has(e,'hr')],['Вид',e=>has(e,'mode')||has(e,'yaw')||has(e,'pit')||has(e,'fov')],['Слои',e=>has(e,'tSh')],['',e=>true]];
 const used=new Set();for(const[t,f]of groups){const g=ctrls.filter(e=>!used.has(e)&&f(e));if(!g.length)continue;if(t)sec(t);g.forEach(e=>{used.add(e);body.appendChild(e);});}
 app.appendChild(panel);
+{const play=q('play'),row=document.createElement('div');row.className='nbp-sl';const v0=Math.round(100*Math.log(SPEED/SPD[0])/Math.log(SPD[1]/SPD[0]));
+row.innerHTML=`<span class="nbp-l">Скорость времени</span><input type="range" data-ui-k="spd" min="0" max="100" step="1" value="${v0}"><span class="nbp-o">${spdTxt(SPEED)}</span>`;
+const pr=play.closest('.nbp-cr');pr.parentNode.insertBefore(row,pr.nextSibling);const inp=row.querySelector('input'),out=row.querySelector('.nbp-o');inp.addEventListener('input',()=>{SPEED=spdOf(+inp.value);out.textContent=spdTxt(SPEED);});}
 const drawer=document.createElement('div');drawer.className='ui-drawer closed';drawer.appendChild(cards);if(dialWrap)drawer.appendChild(dialWrap);app.appendChild(drawer);
 const fabL=document.createElement('div');fabL.className='ui-fab l hide';fabL.innerHTML='<button data-ui="showPanel" title="Панель управления">☰ Панель</button>';app.appendChild(fabL);
 const fabR=document.createElement('div');fabR.className='ui-fab r';fabR.innerHTML='<button data-ui="info" title="Сведения (I)">ⓘ Сведения</button><button data-ui="help" title="Клавиши (?)">?</button>';app.appendChild(fabR);
