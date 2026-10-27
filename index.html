@@ -493,12 +493,18 @@ function hull(P){const p=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);if(p.length
 function box(cx,cy,z0,w,dep,h,ang){const c=Math.cos(ang),s=Math.sin(ang),V8=[];for(const zz of[z0,z0+h])for(const[a,b]of[[-w/2,-dep/2],[w/2,-dep/2],[w/2,dep/2],[-w/2,dep/2]])V8.push([cx+a*c+b*s,cy-a*s+b*c,zz]);return V8;}
 const FACES=[[0,1,2,3],[4,7,6,5],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0]];
 const TXT='class="nbp-ts"';
-// precipitation falls in real time on its own animation loop
-const PREC={n:0,snow:false,sl:0,raf:0,last:0};
-function precLoop(){if(PREC.raf)return;const tick=now=>{PREC.raf=0;if(!root.isConnected||!PREC.n){$('prec').innerHTML='';return;}if(now-PREC.last>=33){PREC.last=now;const t=now/1000,H=VPH+40;let o='';
-for(let i=0;i<PREC.n;i++){const x0=hsh(i,7)*(VPW+80)-40,ph=hsh(i+999,7);if(PREC.snow){const v=40+30*hsh(i,11),y=(ph*H+t*v)%H-20,x=x0+PREC.sl*(y+20)*0.6+Math.sin(t*1.3+i)*6;o+=`<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${(1.2+0.8*hsh(i,12)).toFixed(1)}" fill="#f1efe8" opacity="0.8"/>`;}
-else{const v=700+300*hsh(i,11),y=(ph*H+t*v)%H-20,x=x0+PREC.sl*0.35*(y+20);o+=`<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x+PREC.sl*12).toFixed(0)}" y2="${(y+14).toFixed(0)}" stroke="#c8d4e0" stroke-width="1" opacity="0.55"/>`;}}
-$('prec').innerHTML=o;}PREC.raf=requestAnimationFrame(tick);};PREC.raf=requestAnimationFrame(tick);}
+// precipitation: particles fixed in the world around the viewer (they slide sideways when the camera turns);
+// their own clock runs only while the simulation plays, faster at higher time speeds (logarithmic, capped)
+let tm=null;const PREC={n:0,snow:false,wx:0,wy:0,t:0,raf:0,last:0},RTS=(CAL.day_hours||44)/((CAL.day_real_hours||40)*3600);
+function precMul(){const s=OPT.speed?OPT.speed():(PRM.scene.play_hours_per_s||2.5);return 1+cl(Math.log10(Math.max(1,s/RTS)),0,6.5)*0.8;}
+function precRender(){if(!PREC.n){$('prec').innerHTML='';return;}const t=PREC.t,snow=PREC.snow,N=Math.min(5000,Math.round(PREC.n*360/Math.max(40,Math.min(V.mode==='pan'?360:V.f,360)))),m=precMul(),S=V.S||400;let o='';
+for(let i=0;i<N;i++){const az=hsh(i,21)*360;if(!V.vis(az,30))continue;const r=1.5+38*Math.pow(hsh(i,22),1.6),v=snow?0.9+0.6*hsh(i,23):7+3*hsh(i,23),span=15,ph=hsh(i,24)*span,fall=((ph+t*v)%span),z=11-fall,tau=fall/v;
+let x=r*Math.sin(az*D2R)+PREC.wx*tau,y=r*Math.cos(az*D2R)+PREC.wy*tau;if(snow){x+=Math.sin(t*1.3+i)*0.25;y+=Math.cos(t*1.1+i*1.7)*0.25;}
+const p=[x,y,z-0.0],d=Math.hypot(x,y,z);const q=prj(nrm(p));if(!okp(q)||q[0]<-20||q[0]>VPW+20||q[1]<-20||q[1]>VPH+20)continue;
+if(snow){const rr=cl(0.035/d*S,0.5,4.5);o+=`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${rr.toFixed(1)}" fill="#f1efe8" opacity="${cl(0.95-d/60,0.35,0.9).toFixed(2)}"/>`;}
+else{const L=0.045*m,q2=prj(nrm([x-PREC.wx*L,y-PREC.wy*L,z+v*L]));if(!okp(q2))continue;o+=`<line x1="${q[0].toFixed(1)}" y1="${q[1].toFixed(1)}" x2="${q2[0].toFixed(1)}" y2="${q2[1].toFixed(1)}" stroke="#c8d4e0" stroke-width="${cl(2.2/Math.sqrt(d),0.6,1.6).toFixed(2)}" opacity="${cl(0.75-d/80,0.3,0.7).toFixed(2)}"/>`;}}
+$('prec').innerHTML=o;}
+function precLoop(){if(PREC.raf)return;PREC.last=performance.now();const tick=now=>{PREC.raf=0;if(!root.isConnected||!PREC.n||!tm)return;const dt=Math.min(0.1,(now-PREC.last)/1000);if(dt>=0.03){PREC.last=now;PREC.t+=dt*precMul();precRender();}PREC.raf=requestAnimationFrame(tick);};PREC.raf=requestAnimationFrame(tick);}
 // ---------- draw ----------
 function draw(){setView();const la=cl(+$('lat').value||0,-90,90),lo=cl(+$('lon').value||0,-180,180);if(!LOC||LOC.la!==la||LOC.lo!==lo)locate(la,lo);
 const T=Tnow(),g=geo(T,la,lo),sea=+$('seaD').value,SH=$('tSh').checked,WX=$('tWx').checked,RL=$('tRl').checked,BI=$('tBi').checked;
@@ -648,7 +654,7 @@ if(pl.t==='conifer'){const t=pl.h/Ld[2];pts.push([pl.x-Ld[0]*t,pl.y-Ld[1]*t]);}s
 if(SPV){faces.push(...shipF);const B=LOC.spire.S.beacon;if(B){const v=sub([B[0]-SPV.vx,B[1]-SPV.vy,B[2]-SPV.feet],EYE),bp=prj(nrm(v)),Bc=(LOC.spire.sp.colors||{}).beacon||'#fff2c0';if(okp(bp)){const pu=0.6+0.4*Math.abs(Math.sin(T*DH*6*Math.PI)),rr=cl(400/Math.hypot(...v),2,14);faces.push([Math.hypot(...v)-1,null,null,null,`<circle cx="${bp[0].toFixed(1)}" cy="${bp[1].toFixed(1)}" r="${(rr*2.5*pu).toFixed(1)}" fill="${Bc}" opacity="${(0.3*darkL).toFixed(2)}"/><circle cx="${bp[0].toFixed(1)}" cy="${bp[1].toFixed(1)}" r="${(rr*0.5).toFixed(1)}" fill="${Bc}" opacity="${(0.3+0.7*darkL).toFixed(2)}"/>`]);}}}
 faces.sort((a,b)=>b[0]-a[0]);facesW.sort((a,b)=>b[0]-a[0]);const fstr=L=>L.map(x=>x[4]!==undefined?x[4]:lpoly(x[1],x[2],x[3]||`stroke="${x[2]}" stroke-width="0.5"`)).join('');$('objs').innerHTML=fstr(faces);$('objsW').innerHTML=fstr(facesW);
 // precipitation & fog
-PREC.n=WX&&W.rain>0.02?Math.round(W.rain*140*Math.min(4,VPW*VPH/272000)):0;PREC.snow=!!W.snow;PREC.sl=Math.sin((W.wdir-V.yaw)*D2R)*(W.snow?0.5:1)*cl(W.wspd/12,0.15,1.5);if(PREC.n)precLoop();else $('prec').innerHTML='';
+PREC.n=WX&&W.rain>0.02&&V.mode!=='pan'?Math.round(W.rain*140*Math.min(4,VPW*VPH/272000)):0;PREC.snow=!!W.snow;{const to=(W.wdir+180)*D2R,k=Math.min(W.wspd,15)*(W.snow?0.5:0.35);PREC.wx=Math.sin(to)*k;PREC.wy=Math.cos(to)*k;}precRender();if(PREC.n&&tm)precLoop();
 $('fog').setAttribute('opacity',(WX?W.fog*0.85*(0.3+0.7*br):0).toFixed(2));
 // labels
 let hl='';[[0,'С'],[45,'СВ'],[90,'В'],[135,'ЮВ'],[180,'Ю'],[225,'ЮЗ'],[270,'З'],[315,'СЗ']].forEach(c=>{const p=prj(enu(0,c[0]));if(okp(p)&&p[0]>8&&p[0]<VPW-8&&p[1]>10&&p[1]<VPH-15)hl+=`<text ${TXT} x="${p[0]}" y="${p[1]+14}" text-anchor="middle" style="fill:#d3d1c7">${c[1]}</text>`;});
@@ -710,8 +716,8 @@ $('city').onchange=()=>{if($('city').value!=='')pickCity(+$('city').value);};
 ['yr','sea','dy','hr','yaw','pit','fov','seaD','mode','tSh','tWx','tRl','tBi','oD','oA','oH','oW'].forEach(k=>$(k).addEventListener('input',draw));
 ['tSh','tWx','tRl','tBi'].forEach(k=>$(k).addEventListener('change',draw));
 $('fl').addEventListener('input',()=>{spSetFloor();draw();});
-let tm=null;const stop=()=>{if(tm){cancelAnimationFrame(tm);tm=null;}$('play').textContent='▶ Пуск';};
-$('play').onclick=()=>{if(tm){stop();return;}$('play').textContent='⏸ Пауза';let last=performance.now();const step=now=>{if(!root.isConnected){stop();return;}const spd=OPT.speed?OPT.speed():(PRM.scene.play_hours_per_s||2.5);if(spd<0.02&&now-last<250){tm=requestAnimationFrame(step);return;}const dh=Math.min(Math.max(spd*0.12,spd*0.3),(now-last)/1000*spd);last=now;let h=+$('hr').value+dh;while(h>=DH){h-=DH;let d=+$('dy').value+1;if(d>SD){d=1;let s=$('sea').selectedIndex+1;if(s>3){s=0;$('yr').value=+$('yr').value+1;}$('sea').selectedIndex=s;}$('dy').value=d;}$('hr').value=h.toFixed(4);draw();tm=requestAnimationFrame(step);};tm=requestAnimationFrame(step);};
+tm=null;const stop=()=>{if(tm){cancelAnimationFrame(tm);tm=null;}$('play').textContent='▶ Пуск';};
+$('play').onclick=()=>{if(tm){stop();return;}$('play').textContent='⏸ Пауза';let last=performance.now();setTimeout(()=>{if(PREC.n)precLoop();},0);const step=now=>{if(!root.isConnected){stop();return;}const spd=OPT.speed?OPT.speed():(PRM.scene.play_hours_per_s||2.5);if(spd<0.02&&now-last<250){tm=requestAnimationFrame(step);return;}const dh=Math.min(Math.max(spd*0.12,spd*0.3),(now-last)/1000*spd);last=now;let h=+$('hr').value+dh;while(h>=DH){h-=DH;let d=+$('dy').value+1;if(d>SD){d=1;let s=$('sea').selectedIndex+1;if(s>3){s=0;$('yr').value=+$('yr').value+1;}$('sea').selectedIndex=s;}$('dy').value=d;}$('hr').value=h.toFixed(4);draw();tm=requestAnimationFrame(step);};tm=requestAnimationFrame(step);};
 $('yr').value=inp.year??CAL.start_year;$('sea').selectedIndex=typeof inp.season==='string'?Math.max(0,secs.indexOf(inp.season)):(inp.season??0);
 if(inp.floor!==undefined)$('fl').value=inp.floor;$('dy').value=inp.day??1;$('hr').value=inp.hour??6;$('fov').value=inp.fov??PRM.scene.default_fov;$('mode').value=inp.mode??'cam';
 let ci=PRE.findIndex(c=>c[0].startsWith(inp.city||PRM.scene.default_city));if(ci<0)ci=1;pickCity(ci);
