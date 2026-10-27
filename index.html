@@ -690,7 +690,7 @@ $('city').onchange=()=>{if($('city').value!=='')pickCity(+$('city').value);};
 ['tSh','tWx','tRl','tBi'].forEach(k=>$(k).addEventListener('change',draw));
 $('fl').addEventListener('input',()=>{spSetFloor();draw();});
 let tm=null;const stop=()=>{if(tm){cancelAnimationFrame(tm);tm=null;}$('play').textContent='▶ Пуск';};
-$('play').onclick=()=>{if(tm){stop();return;}$('play').textContent='⏸ Пауза';let last=performance.now();const step=now=>{if(!root.isConnected){stop();return;}const spd=OPT.speed?OPT.speed():(PRM.scene.play_hours_per_s||2.5),dh=Math.min(spd*0.12,(now-last)/1000*spd);last=now;let h=+$('hr').value+dh;while(h>=DH){h-=DH;let d=+$('dy').value+1;if(d>SD){d=1;let s=$('sea').selectedIndex+1;if(s>3){s=0;$('yr').value=+$('yr').value+1;}$('sea').selectedIndex=s;}$('dy').value=d;}$('hr').value=h.toFixed(4);draw();tm=requestAnimationFrame(step);};tm=requestAnimationFrame(step);};
+$('play').onclick=()=>{if(tm){stop();return;}$('play').textContent='⏸ Пауза';let last=performance.now();const step=now=>{if(!root.isConnected){stop();return;}const spd=OPT.speed?OPT.speed():(PRM.scene.play_hours_per_s||2.5);if(spd<0.02&&now-last<250){tm=requestAnimationFrame(step);return;}const dh=Math.min(Math.max(spd*0.12,spd*0.3),(now-last)/1000*spd);last=now;let h=+$('hr').value+dh;while(h>=DH){h-=DH;let d=+$('dy').value+1;if(d>SD){d=1;let s=$('sea').selectedIndex+1;if(s>3){s=0;$('yr').value=+$('yr').value+1;}$('sea').selectedIndex=s;}$('dy').value=d;}$('hr').value=h.toFixed(4);draw();tm=requestAnimationFrame(step);};tm=requestAnimationFrame(step);};
 $('yr').value=inp.year??CAL.start_year;$('sea').selectedIndex=typeof inp.season==='string'?Math.max(0,secs.indexOf(inp.season)):(inp.season??0);
 if(inp.floor!==undefined)$('fl').value=inp.floor;$('dy').value=inp.day??1;$('hr').value=inp.hour??6;$('fov').value=inp.fov??PRM.scene.default_fov;$('mode').value=inp.mode??'cam';
 let ci=PRE.findIndex(c=>c[0].startsWith(inp.city||PRM.scene.default_city));if(ci<0)ci=1;pickCity(ci);
@@ -701,7 +701,7 @@ const css='';
 const W0=innerWidth,H0=innerHeight;
 let infoOff=true;
 // play speed: logarithmic slider, world hours per real second
-const SPD=[0.05,880],spdOf=v=>SPD[0]*Math.pow(SPD[1]/SPD[0],v/100),spdTxt=h=>h<1?`${Math.round(h*60)} мин/с`:h<44?`${h<10?h.toFixed(1):Math.round(h)} ч/с`:`${(h/44).toFixed(h<440?1:0)} сут/с`;let SPEED=2.5;
+const RT=(PARAMS.calendar.day_hours||44)/((PARAMS.calendar.day_real_hours||40)*3600),SPD=[RT,880],spdOf=v=>SPD[0]*Math.pow(SPD[1]/SPD[0],v/100),spdTxt=h=>h<=RT*1.0001?'1:1 · реальное время':h<RT*60?`×${Math.round(h/RT)}`:h<1?`${Math.round(h*60)} мин/с`:h<44?`${h<10?h.toFixed(1):Math.round(h)} ч/с`:`${(h/44).toFixed(h<440?1:0)} сут/с`;let SPEED=2.5;
 const S=initScene(app,DATA,{speed:()=>SPEED,lazyInfo:()=>infoOff,params:PARAMS,theme:{text:"#e8e6e1",border:"rgba(255,255,255,.18)"},css,vw:W0,vh:H0});
 const q=k=>app.querySelector(`[data-k="${k}"]`);
 // ---- rearrange the generated interface: stage / left panel / right drawer ----
@@ -719,7 +719,7 @@ const groups=[['Место',e=>has(e,'city')||has(e,'flRow')||e.dataset.k==='flR
 const used=new Set();for(const[t,f]of groups){const g=ctrls.filter(e=>!used.has(e)&&f(e));if(!g.length)continue;if(t)sec(t);g.forEach(e=>{used.add(e);body.appendChild(e);});}
 app.appendChild(panel);
 {const play=q('play'),row=document.createElement('div');row.className='nbp-sl';const v0=Math.round(100*Math.log(SPEED/SPD[0])/Math.log(SPD[1]/SPD[0]));
-row.innerHTML=`<span class="nbp-l">Скорость времени</span><input type="range" data-ui-k="spd" min="0" max="100" step="1" value="${v0}"><span class="nbp-o">${spdTxt(SPEED)}</span>`;
+row.innerHTML=`<span class="nbp-l">Скорость времени</span><input type="range" data-ui-k="spd" min="0" max="100" step="0.5" value="${v0}"><span class="nbp-o">${spdTxt(SPEED)}</span>`;
 const pr=play.closest('.nbp-cr');pr.parentNode.insertBefore(row,pr.nextSibling);const inp=row.querySelector('input'),out=row.querySelector('.nbp-o');inp.addEventListener('input',()=>{SPEED=spdOf(+inp.value);out.textContent=spdTxt(SPEED);});}
 const drawer=document.createElement('div');drawer.className='ui-drawer closed';drawer.appendChild(cards);if(dialWrap)drawer.appendChild(dialWrap);app.appendChild(drawer);
 const fabL=document.createElement('div');fabL.className='ui-fab l hide';fabL.innerHTML='<button data-ui="showPanel" title="Панель управления">☰ Панель</button>';app.appendChild(fabL);
